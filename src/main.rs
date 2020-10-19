@@ -3,14 +3,14 @@ use bevy::{
     render::pass::ClearColor,
 };
 
-use rand::Rng;
+
 
 
 //use bevy_prototype_lyon::prelude::*;
 
-mod primitives;
 mod input;
 mod city;
+mod roadsystem;
 
 const WINDOW_WIDTH: u32 = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
@@ -25,11 +25,6 @@ fn mouse_pos_ws(mouse_pos: Vec2) -> Vec2 {
     )
 }
 
-fn generate_random_color() -> Color {
-    let mut rng = rand::thread_rng();
-
-    Color::rgb(rng.gen::<f32>(), rng.gen::<f32>(), rng.gen::<f32>())
-}
 
 fn spawn_temp_street(commands: &mut Commands, materials: &mut ResMut<Assets<ColorMaterial>>) {
         // create temp street for visualization
@@ -46,6 +41,19 @@ fn spawn_temp_street(commands: &mut Commands, materials: &mut ResMut<Assets<Colo
         .with(TempStraightStreet); 
 }
 
+
+fn road_network_change_tracking_system(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut q1: Query<Mutated<roadsystem::RoadSystem>>,
+) {
+    for a in &mut q1.iter() {
+        a.update(&mut commands, &mut materials);
+        println!("{}", *a);
+    }
+    
+}
+
 fn build_street( 
     mut commands: Commands,    
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -53,6 +61,9 @@ fn build_street(
     mouse_button_input: Res<Input<MouseButton>>,
     mut street_query: Query<Without<TempStraightStreet, (&mut Sprite, &mut Transform, &mut city::StraightStreet)>>,
     mut temp_query: Query<With<TempStraightStreet, (Entity, &mut Sprite, &mut Transform, &mut city::StraightStreet)>>,
+    mut intersection_query: Query<With<roadsystem::RoadIntersection, Entity>>,
+    mut road_query: Query<With<roadsystem::Road, Entity>>,
+    mut graph_query: Query<(&Graph, &mut roadsystem::RoadSystem)>
 ) {     
     let mouse_pos_ws = mouse_pos_ws(state.mouse_position);
 
@@ -79,54 +90,57 @@ fn build_street(
     
     if mouse_button_input.just_released(MouseButton::Left) {
         // remove temp street entity
-        for (entity, _, _, temp_street) in &mut temp_query.iter() {
-            
-
-            for (mut street_sprite, mut street_transform, mut street) in &mut street_query.iter() {
-                if let Some(intersection) = temp_street.intersection(&street) {
-                    let old_end = street.end;
-                    street.set_end(intersection);
-                    street_sprite.size.set_x(street.length());
-                    *street_transform = Transform::from_translation_rotation(Vec3::new(street.position.x(), street.position.y(), 0.0), Quat::from_rotation_z(street.rotation));
-
-                    let new_street = city::StraightStreet::new(intersection, old_end);
-                    commands
-                    .spawn(SpriteComponents {
-                        material: materials.add(generate_random_color().into()),            
-                        transform: Transform::from_translation_rotation(Vec3::new(new_street.position.x(), new_street.position.y(), 0.0), Quat::from_rotation_z(new_street.rotation)),            
-                        sprite: Sprite::new(Vec2::new(new_street.length(), 30.0)),
-                        ..Default::default()
-                    })
-                    .with(new_street);
-                }
-            }
-
+        for (entity, _, _, temp_street) in &mut temp_query.iter() { 
             commands.despawn(entity);
         }
+
+        //let connected_streets = vec![new_street_entity];
+
+        for (_, mut road_system) in &mut graph_query.iter() { 
+            for entity in &mut intersection_query.iter() {
+                commands.despawn(entity);
+            }
+
+            for entity in &mut road_query.iter() {
+                commands.despawn(entity);
+            }
+            
+            let node1_index = road_system.insert_intersection(roadsystem::RoadIntersection::new(state.last_mouse_left_pressed_position));
+            let node2_index = road_system.insert_intersection(roadsystem::RoadIntersection::new(mouse_pos_ws));
+
+            road_system.connect_intersections(node1_index, node2_index);
+
+            println!("{}", intersection_query.iter().into_iter().len());
+        }
         
+        /*
+        // Place Start Node
+        let _start_intersection = commands
+            .spawn(SpriteComponents {
+                material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),            
+                transform: Transform::from_translation(Vec3::new(state.last_mouse_left_pressed_position.x(), state.last_mouse_left_pressed_position.y(), 2.0)),            
+                sprite: Sprite::new(Vec2::new(40.0, 40.0)),
+                ..Default::default()
+            })
+            .with(city::Intersection{
+                connected_streets: connected_streets.clone()
+            })
+            .current_entity()
+            .unwrap();
 
-        
-
-
-
-        let new_street = city::StraightStreet {
-            start: state.last_mouse_left_pressed_position,
-            end: mouse_pos_ws,
-            position: street_center,
-            rotation: rotation
-        };
-
-
-        
-        
-        commands
-        .spawn(SpriteComponents {
-            material: materials.add(generate_random_color().into()),            
-            transform: Transform::from_translation_rotation(Vec3::new(street_center.x(), street_center.y(), 0.0), Quat::from_rotation_z(rotation)),            
-            sprite: Sprite::new(Vec2::new(street_length, 30.0)),
-            ..Default::default()
-        })
-        .with(new_street);
+        let _end_intersection = commands
+            .spawn(SpriteComponents {
+                material: materials.add(Color::rgb(0.0, 0.0, 1.0).into()),            
+                transform: Transform::from_translation(Vec3::new(mouse_pos_ws.x(), mouse_pos_ws.y(), 2.0)),            
+                sprite: Sprite::new(Vec2::new(40.0, 40.0)),
+                ..Default::default()
+            })
+            .with(city::Intersection{
+                connected_streets: connected_streets
+            })
+            .current_entity()
+            .unwrap();
+        */
     }       
 }
 
@@ -155,7 +169,7 @@ fn keyboard_input_system(keyboard_input: Res<Input<KeyCode>>, mut exit_event: Re
     }
 }
 
-
+struct Graph;
 
 fn setup(
     mut commands: Commands,
@@ -163,7 +177,8 @@ fn setup(
     commands
         // cameras
         .spawn(Camera2dComponents::default())
-        .spawn(UiCameraComponents::default());
+        .spawn(UiCameraComponents::default())
+        .spawn((Graph, roadsystem::RoadSystem::new()));
 }
 
 fn main() {
@@ -184,6 +199,7 @@ fn main() {
 
     .add_system(keyboard_input_system.system())
     .add_system(input::print_mouse_events_system.system())
+    .add_system(road_network_change_tracking_system.system())
     .add_startup_system(setup.system())
     .run();
 }
