@@ -64,6 +64,32 @@ impl RoadSystem {
         todo!();
     }
 
+    pub fn point_intersect_connection(&self, point: Vec2) -> Option<Road> {
+        for edge_index in self.graph.edge_indices() {
+            if let Some((start, end)) = self.graph.edge_endpoints(edge_index) {
+
+                let source = self.graph.node_weight(start);
+                let target = self.graph.node_weight(end);
+        
+                if let (
+                    Some(source), 
+                    Some(target),
+                ) = (source, target) {
+                    let source = source.position;
+                    let target = target.position;
+
+                    let cross = (point - source).perp_dot(target - source);
+
+                    println!("{}", cross);
+                    
+                    
+                }  
+            }
+        }
+
+        None
+    }
+
     fn find_intersections(&self, intersection1: NodeIndex, intersection2: NodeIndex) -> Vec<(EdgeIndex, Vec2)> {
         let mut intersections = Vec::new();
 

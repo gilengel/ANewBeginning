@@ -8,6 +8,9 @@ mod city;
 mod roadsystem;
 mod ui;
 
+mod math;
+
+
 
 const WINDOW_WIDTH: u32 = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
@@ -45,6 +48,26 @@ fn road_network_change_tracking_system(
     for a in &mut q1.iter() {
         a.update(&mut commands, &mut materials);
     }    
+}
+
+fn destroy_street(
+    mut commands: Commands,    
+    current_action: Res<ui::RoadActions>,
+    mut state: ResMut<input::MouseState>,
+    mut graph_query: Query<(&Graph, &mut roadsystem::RoadSystem)>
+) {
+    if *current_action != ui::RoadActions::Demolish {
+        return;
+    }
+
+    let mouse_pos_ws = mouse_pos_ws(state.mouse_position);
+
+    for (_, mut road_system) in &mut graph_query.iter() { 
+        road_system.point_intersect_connection(mouse_pos_ws);
+    }
+    
+
+    
 }
 
 fn build_street( 
@@ -128,6 +151,7 @@ impl Default for StreetBuildingPlugin {
 impl Plugin for StreetBuildingPlugin {
     fn build(&self, app: &mut AppBuilder) {
         app.add_system(build_street.system()); 
+        app.add_system(destroy_street.system());
     }    
 }
 
