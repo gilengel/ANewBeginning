@@ -42,11 +42,12 @@ fn spawn_temp_street(commands: &mut Commands, materials: &mut ResMut<Assets<Colo
 
 fn road_network_change_tracking_system(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut q1: Query<Mutated<roadsystem::RoadSystem>>,
 ) {
     for a in &mut q1.iter() {
-        a.update(&mut commands, &mut materials);
+        a.update(&mut commands, &mut materials, &mut meshes);
     }    
 }
 
@@ -78,7 +79,7 @@ fn build_street(
     mouse_button_input: Res<Input<MouseButton>>,
     mut temp_query: Query<With<TempStraightStreet, (Entity, &mut Sprite, &mut Transform, &mut city::StraightStreet)>>,
     mut intersection_query: Query<With<roadsystem::RoadIntersection, Entity>>,
-    mut road_query: Query<With<roadsystem::Road, Entity>>,
+    mut road_query: Query<With<math::line::Line, Entity>>,
     mut graph_query: Query<(&Graph, &mut roadsystem::RoadSystem)>
 ) {     
     if *current_action != ui::RoadActions::Build {
@@ -150,8 +151,11 @@ impl Default for StreetBuildingPlugin {
 
 impl Plugin for StreetBuildingPlugin {
     fn build(&self, app: &mut AppBuilder) {
-        app.add_system(build_street.system()); 
-        app.add_system(destroy_street.system());
+        app.add_stage_after("ui_handling", "do_things");
+        app.add_system_to_stage("do_things", build_street.system());
+        app.add_system_to_stage("do_things", destroy_street.system());
+        //app.add_system(build_street.system()); 
+        //app.add_system(destroy_street.system());
     }    
 }
 
@@ -273,15 +277,20 @@ fn main() {
         ..Default::default()
     })
     .add_resource(ui::RoadActions::Nothing)
-    .add_default_plugins()    
-    .init_resource::<ui::ButtonMaterials>()
-    .add_plugin(StreetBuildingPlugin { ..Default::default() })
-    .add_event::<bevy::app::AppExit>()
     .add_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
     .init_resource::<input::MouseState>()
+    .add_default_plugins()    
+    .init_resource::<ui::ButtonMaterials>()
 
-    .add_system(button_system.system())
-    .add_system(toggle_button_sytem.system())
+    .add_stage_after(stage::PRE_UPDATE, "ui_handling")
+    .add_system_to_stage_front("ui_handling", toggle_button_sytem.system())
+    .add_system_to_stage_front("ui_handling", button_system.system())
+
+    .add_plugin(StreetBuildingPlugin { ..Default::default() })
+    .add_event::<bevy::app::AppExit>()
+
+
+
     .add_system(keyboard_input_system.system())
     .add_system(input::print_mouse_events_system.system())
     .add_system(road_network_change_tracking_system.system())

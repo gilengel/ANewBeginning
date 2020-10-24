@@ -1,17 +1,10 @@
 use bevy::prelude::*;
-use std::fmt;
 
 use crate::math::operations::{ Center, Intersects };
 
 pub struct Line {
     pub point1: Vec2,
     pub point2: Vec2
-}
-
-impl fmt::Display for Line {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "p1({}, {}) p2({}, {})", self.point1.x(), self.point1.y(), self.point2.x(), self.point2.y())
-    }
 }
 
 impl Line {
@@ -43,6 +36,21 @@ impl Intersects<Line> for Line {
     }
 }
 
+pub trait Parallel<T> {
+    fn parralel(&self, offset: f32) -> T; 
+}
+
+impl Parallel<Line> for Line {
+    fn parralel(&self, offset: f32) -> Line {
+        let vec = self.point1 - self.point2;
+        
+        Line {
+            point1: Vec2::new(-vec.y(), vec.x()).normalize() * offset + self.point1,
+            point2: Vec2::new(-vec.y(), vec.x()).normalize() * offset + self.point2
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bevy::prelude::*;
@@ -62,6 +70,7 @@ mod tests {
 
         assert_eq!(line1.intersects(&line2), true);
     }
+
     #[test]
     fn lines_not_intersects() {
         let line1 = Line {

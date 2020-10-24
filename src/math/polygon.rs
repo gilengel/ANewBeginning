@@ -1,11 +1,12 @@
 use bevy::prelude::*;
 
-use crate::math::operations::{ Center, Intersects };
+use crate::math::operations::{ Center, Intersects, Inside };
 use crate::math::line::Line;
 
 pub struct Polygon {
     points: Vec<Vec2>
 }
+
 
 impl Center for Polygon {
     fn center(&self) -> Vec2 {
@@ -44,12 +45,12 @@ fn convert_points_to_lines(polygon: &Polygon) -> Vec<Line> {
     while let Some(point) = iter.next() {
         if let Some(next) = iter.peek() {
             lines.push(Line {
-                point1: point.clone(),
-                point2: *next.clone()
+                point1: *point,
+                point2: **next
             });
         } else {
             lines.push(Line {
-                point1: point.clone(),
+                point1: *point,
                 point2: *polygon.points.first().unwrap()
             });
         }        
@@ -60,18 +61,67 @@ fn convert_points_to_lines(polygon: &Polygon) -> Vec<Line> {
 
 impl Intersects<Polygon> for Polygon {
     fn intersects(&self, other: &Polygon) -> bool {
-        println!("AOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
         for line in convert_points_to_lines(self) {
-            println!("{}", line);
             for other_line in convert_points_to_lines(other) {
                 if line.intersects(&other_line) {
-                    println!("{} {}", line, other_line);
                     return true;
                 }
             }
         }
 
         false
+    }
+}
+
+impl Intersects<Line> for Polygon {
+    fn intersects(&self, other: &Line) -> bool {
+        for line in convert_points_to_lines(self) {
+            if line.intersects(&other) {
+                return true;
+            }
+        }   
+
+        false
+    }
+}
+
+impl Inside<Polygon> for Vec2 {
+    fn inside(&self, other_object: &Polygon) -> bool {
+        let line = Line {
+            point1: *self,
+            point2: Vec2::new(f32::MAX / 1000.0, self.y())
+        };
+
+        // Return false if polygon is a point, line or empty
+        if other_object.points.len() < 3 {
+            return false;
+        }
+
+        let mut iter = other_object.points.iter().peekable();
+        let mut count = 0;
+        while let Some(point) = iter.next() {
+            let other = match iter.peek() {
+                Some(next) => Line {
+                    point1: *point,
+                    point2: **next,
+                },
+                None => Line {
+                    point1: *point,
+                    point2: *other_object.points.first().unwrap()
+                }
+
+            };
+
+            if line.intersects(&other) {
+                count = count + 1;
+            } 
+        }
+
+        if count == 0 {
+            return false;
+        }
+
+        return count % 2 != 0
     }
 }
 
@@ -151,5 +201,33 @@ mod tests {
         };     
 
         assert_eq!(polygon.intersects(&polygon2), false);
+    }
+
+    #[test]
+    fn point_inside_polygon() {
+        let polygon = Polygon {
+            points: vec![
+                Vec2::new(0.0, 0.0),
+                Vec2::new(100.0, 0.0),
+                Vec2::new(100.0, 100.0),
+                Vec2::new(0.0, 100.0)
+                ]
+        };  
+
+        assert_eq!(Vec2::new(50.0, 50.0).inside(&polygon), true);
+    }
+
+    #[test]
+    fn point_not_inside_polygon() {
+        let polygon = Polygon {
+            points: vec![
+                Vec2::new(0.0, 0.0),
+                Vec2::new(100.0, 0.0),
+                Vec2::new(100.0, 100.0),
+                Vec2::new(0.0, 100.0)
+                ]
+        };  
+
+        assert_eq!(Vec2::new(150.0, 50.0).inside(&polygon), false);
     }
 }

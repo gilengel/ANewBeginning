@@ -12,9 +12,14 @@ use bevy::{
     prelude::*,
 };
 
+use bevy_prototype_lyon::prelude::*;
+use std::f32::consts::{FRAC_PI_6, PI};
+
 
 use std::fmt;
 
+use crate::math::line::{ Line, Parallel };
+use crate::math::polygon::Polygon;
 
 use rand::Rng;
 
@@ -32,8 +37,6 @@ struct GraphEntityIndex {
 pub struct RoadSystem {
     graph: StableGraph::<RoadIntersection, ()>
 }
-
-pub struct Road {}
 
 pub struct RoadIntersection {
     pub position: Vec2,
@@ -64,7 +67,7 @@ impl RoadSystem {
         todo!();
     }
 
-    pub fn point_intersect_connection(&self, point: Vec2) -> Option<Road> {
+    pub fn point_intersect_connection(&self, point: Vec2) -> Option<Line> {
         for edge_index in self.graph.edge_indices() {
             if let Some((start, end)) = self.graph.edge_endpoints(edge_index) {
 
@@ -79,10 +82,7 @@ impl RoadSystem {
                     let target = target.position;
 
                     let cross = (point - source).perp_dot(target - source);
-
-                    println!("{}", cross);
-                    
-                    
+                   
                 }  
             }
         }
@@ -154,7 +154,7 @@ impl RoadSystem {
         todo!();
     }
 
-    pub fn update(&self, commands: &mut Commands, materials: &mut ResMut<Assets<ColorMaterial>>) {
+    pub fn update(&self, commands: &mut Commands, materials: &mut ResMut<Assets<ColorMaterial>>, mut meshes: &mut ResMut<Assets<Mesh>>) {
         // build the intersections
         for (_, node) in self.graph.node_references() {
             commands
@@ -177,19 +177,35 @@ impl RoadSystem {
             if let (Some(source), Some(target)) = (source, target) {
                 let street_vector = target.position - source.position;
                 let street_length = street_vector.length();
-                let street_center = source.position + street_vector / street_length * street_length / 2.0;
-                let rotation = -street_vector.angle_between(Vec2::new(1.0, 0.0)); 
+                //let street_center = source.position + street_vector / street_length * street_length / 2.0;
+                //let rotation = -street_vector.angle_between(Vec2::new(1.0, 0.0)); 
 
-                //let new_street = city::StraightStreet::new(intersection, old_end);
+                let line = Line {
+                    point1: source.position,
+                    point2: target.position
+                };
+
+                let parallel_line = line.parralel(5.0);
+                let blue = materials.add(Color::rgb(0.1, 0.4, 0.5).into());
+
+                let mut builder = PathBuilder::new();
+                // Using that builder, you can build any shape:
+                builder.move_to(point(line.point1.x(), line.point1.y()));
+                builder.line_to(point(line.point2.x(), line.point2.y()));
+                builder.line_to(point(parallel_line.point2.x(), parallel_line.point2.y()));
+                builder.line_to(point(parallel_line.point1.x(), parallel_line.point1.y()));
+                
+                builder.close(); // This draws a line to (0.0, 0.0)                            
+
+                let path = builder.build();
                 commands
-                .spawn(SpriteComponents {
-                    material: materials.add(generate_random_color().into()),         
-                    transform: Transform::from_translation_rotation(Vec3::new(street_center.x(), street_center.y(), 0.0), Quat::from_rotation_z(rotation)),            
-                    sprite: Sprite::new(Vec2::new(street_length, 10.0)),
-                    ..Default::default()
-                })
-                .with(Road {
-                });            
+                .spawn(path.fill(
+                    blue,
+                    &mut meshes,
+                    Vec3::new(0.0, 0.0, 0.0),
+                    &FillOptions::default(),
+                ))
+                .with(line);      
             }
         }
     }
