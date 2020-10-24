@@ -15,6 +15,21 @@ mod math;
 const WINDOW_WIDTH: u32 = 1920;
 const WINDOW_HEIGHT: u32 = 1080;
 
+struct BuildMaterials {
+    valid: Handle<ColorMaterial>,
+    invalid: Handle<ColorMaterial>
+}
+
+impl FromResources for BuildMaterials {
+    fn from_resources(resources: &Resources) -> Self {
+        let mut materials = resources.get_mut::<Assets<ColorMaterial>>().unwrap();
+        BuildMaterials {
+            valid: materials.add(Color::rgb(0.35, 0.75, 0.35).into()),
+            invalid: materials.add(Color::rgb(0.75, 0.35, 0.35).into())
+        }
+    }
+}
+
 struct TempStraightStreet;
 
 // Transforms the mouse position from screen into world coordinate system
@@ -74,10 +89,11 @@ fn destroy_street(
 fn build_street( 
     mut commands: Commands,    
     current_action: Res<ui::RoadActions>,
+    build_materials: Res<BuildMaterials>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut state: ResMut<input::MouseState>,
     mouse_button_input: Res<Input<MouseButton>>,
-    mut temp_query: Query<With<TempStraightStreet, (Entity, &mut Sprite, &mut Transform, &mut city::StraightStreet)>>,
+    mut temp_query: Query<With<TempStraightStreet, (Entity, &mut Sprite, &mut Handle<ColorMaterial>, &mut Transform, &mut city::StraightStreet)>>,
     mut intersection_query: Query<With<roadsystem::RoadIntersection, Entity>>,
     mut road_query: Query<With<math::line::Line, Entity>>,
     mut graph_query: Query<(&Graph, &mut roadsystem::RoadSystem)>
@@ -99,19 +115,30 @@ fn build_street(
     let street_center = state.last_mouse_left_pressed_position + street_vector / street_length * street_length / 2.0;
     let rotation = -street_vector.angle_between(Vec2::new(1.0, 0.0)); 
 
+    
+
     // update temp street length, orientation and position
-    for (_, mut sprite, mut transform, mut temp_street) in &mut temp_query.iter() {
+    for (_, mut sprite, mut material, mut transform, mut temp_street) in &mut temp_query.iter() {
+
         *transform = Transform::from_translation_rotation(Vec3::new(street_center.x(), street_center.y(), 0.0), Quat::from_rotation_z(rotation));
         sprite.size.set_x(street_length);
+        
 
         temp_street.set_start(street_center - street_vector.normalize() * street_length / 2.0);
         temp_street.set_end(street_center + street_vector.normalize() * street_length / 2.0); 
+
+        for (_, mut road_system) in &mut graph_query.iter() { 
+            match road_system.valid_connection(&temp_street.start, &temp_street.end) {
+                true => *material = build_materials.valid.clone(),
+                false => *material = build_materials.invalid.clone(),
+            }
+        }
     }
 
     
     if mouse_button_input.just_released(MouseButton::Left) {
         // remove temp street entity
-        for (entity, _, _, _) in &mut temp_query.iter() { 
+        for (entity, _, _, _, _) in &mut temp_query.iter() { 
             commands.despawn(entity);
         }
 
@@ -129,6 +156,8 @@ fn build_street(
                 commands.despawn(entity);
             }
             
+            assert_ne!(state.last_mouse_left_pressed_position, mouse_pos_ws);
+
             let node1_index = road_system.insert_intersection(roadsystem::RoadIntersection::new(state.last_mouse_left_pressed_position));
             let node2_index = road_system.insert_intersection(roadsystem::RoadIntersection::new(mouse_pos_ws));
 
@@ -276,10 +305,12 @@ fn main() {
         resizable: false,
         ..Default::default()
     })
+    .add_default_plugins() 
     .add_resource(ui::RoadActions::Nothing)
     .add_resource(ClearColor(Color::rgb(0.9, 0.9, 0.9)))
+    .init_resource::<BuildMaterials>()
     .init_resource::<input::MouseState>()
-    .add_default_plugins()    
+       
     .init_resource::<ui::ButtonMaterials>()
 
     .add_stage_after(stage::PRE_UPDATE, "ui_handling")

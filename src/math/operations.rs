@@ -15,3 +15,7 @@ pub trait Inside<T> {
 pub trait Overlaps<T> {
     fn overlaps(&self, other_object: &T) -> bool;
 }
+
+pub trait Valid {
+    fn valid(&self) -> bool;
+}

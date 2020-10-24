@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::math::operations::{ Center, Intersects };
+use crate::math::operations::{ Center, Intersects, Valid };
 
 pub struct Line {
     pub point1: Vec2,
@@ -48,6 +48,18 @@ impl Parallel<Line> for Line {
             point1: Vec2::new(-vec.y(), vec.x()).normalize() * offset + self.point1,
             point2: Vec2::new(-vec.y(), vec.x()).normalize() * offset + self.point2
         }
+    }
+}
+
+impl Valid for Vec2 {
+    fn valid(&self) -> bool {
+        self.x().is_normal() && self.y().is_normal()
+    }
+}
+
+impl Valid for Line {
+    fn valid(&self) -> bool {
+        self.point1.valid() && self.point2.valid()
     }
 }
 
