@@ -1,0 +1,123 @@
+#![enable(implicit_some)]
+// Detailed field information can be found at https://docs.amethyst.rs/master/amethyst_ui/enum.UiWidget.html and related pages
+Container(
+    transform: (
+        id: "background",
+        anchor: TopLeft,
+        y: -24,
+        //stretch: X( x_margin: 0., y_margin: 0., keep_aspect_ratio: false),
+        width: 852.,
+        height: 48.,
+    ),
+    background: SolidColor(0.03, 0.03, 0.03, 1.0),
+    children: [
+
+        Container(
+            transform: (
+                id: "container_start",
+
+                x: 84,
+                width: 154.,
+                height: 36.,
+                anchor: Middle,
+            ),
+            background: SolidColor(1.0, 0.65, 0., 1.0),
+            children: [
+
+                Button(
+                    transform: (
+                        id: "CreateRoad",
+                        width: 150.,
+                        height: 32.,
+                        tab_order: 1,
+                        anchor: Middle,
+                        mouse_reactive: true,
+                    ),
+                    button: (
+                        text: "Create Road",
+                        font: File("fonts/Bangers-Regular.ttf", ("TTF", ())),
+                        font_size: 24.,
+                        normal_text_color: (1.0, 0.65, 0., 1.0), // ffa500
+                        normal_image: SolidColor(0., 0., 0., 1.),
+                        hover_image: SolidColor(0.1, 0.1, 0.1, 1.),
+                        press_image: SolidColor(0.15, 0.15, 0.15, 1.),
+                    )
+                ),
+
+                
+            ]
+        ),
+        
+
+        Container(
+            transform: (
+                id: "container_start",
+
+                x: 244,
+                width: 154.,
+                height: 36.,
+                anchor: Middle,
+            ),
+            background: SolidColor(1.0, 0.65, 0., 1.0),
+            children: [
+
+                Button(
+                    transform: (
+                        id: "DemolishRoad",
+                        width: 150.,
+                        height: 32.,
+                        tab_order: 1,
+                        anchor: Middle,
+                        mouse_reactive: true,
+                    ),
+                    button: (
+                        text: "Demolish Road",
+                        font: File("fonts/Bangers-Regular.ttf", ("TTF", ())),
+                        font_size: 24.,
+                        normal_text_color: (1.0, 0.65, 0., 1.0), // ffa500
+                        normal_image: SolidColor(0., 0., 0., 1.),
+                        hover_image: SolidColor(0.1, 0.1, 0.1, 1.),
+                        press_image: SolidColor(0.15, 0.15, 0.15, 1.),
+                    )
+                ),                
+            ]
+        ),
+
+        Label(
+            transform: (
+                id: "fps",
+                x: 380.,
+                width: 200.,
+                height: 25.,
+                tab_order: 2,
+                anchor: Middle,
+                opaque: true,
+            ),
+            text: (
+                text: "N/A",
+                font: File("fonts/Bangers-Regular.ttf", ("TTF", ())),
+                font_size: 20.,
+                color: (1.0, 0.65, 0., 1.0),
+            )
+        ),
+
+        Label(
+            transform: (
+                id: "mouse_position",
+                x: 380.,
+                y: -50.,
+                width: 200.,
+                height: 25.,
+                tab_order: 2,
+                anchor: Middle,
+                opaque: true,
+            ),
+            text: (
+                text: "N/A",
+                font_size: 25.,
+                color: (1., 1., 1., 1.),
+                font: File("fonts/Bangers-Regular.ttf", ("TTF", ())),
+            ),
+        ),
+    ]
+)
