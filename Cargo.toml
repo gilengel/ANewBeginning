@@ -12,6 +12,8 @@ edition = "2018"
 #petgraph = "0.5.1"
 amethyst = {version = "0.15.3", features = ["no-slow-safety-checks"]}
 log = { version = "0.4.8", features = ["serde"] }
+amethyst_lyon = { path = "../amethyst_lyon" }
+lyon = "0.16.2"
 
 [features]
 default = ["vulkan"]

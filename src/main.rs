@@ -343,6 +343,8 @@ use amethyst::{
     utils::{application_root_dir, fps_counter::FpsCounterBundle},
 };
 
+use amethyst_lyon::RenderLyon;
+
 mod state;
 
 fn main() -> amethyst::Result<()> {
@@ -368,7 +370,8 @@ fn main() -> amethyst::Result<()> {
                         .with_clear([0.34, 0.36, 1.0, 1.0]),
                 )
                 .with_plugin(RenderUi::default())
-                .with_plugin(RenderFlat2D::default()),
+                .with_plugin(RenderFlat2D::default())
+                .with_plugin(RenderLyon::default()),     
         )?
         .with(state::MouseRaycastSystem, "MouseRaycastSystem", &["input_system"])
         .with(state::MousePositionPrintSystem, "MousePositionPrintSystem", &["MouseRaycastSystem"]);

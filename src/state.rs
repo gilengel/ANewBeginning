@@ -1,10 +1,10 @@
 use amethyst::{
-    input::{InputHandler, StringBindings, is_close_requested, is_key_down, VirtualKeyCode, Button},
+    input::{InputHandler, StringBindings, is_close_requested, is_key_down, VirtualKeyCode},
     prelude::*,
     assets::{AssetStorage, Handle, Loader},
     core::{
         geometry::Plane,
-        math::{Point2, Point3, Vector2, Vector3, Scalar},
+        math::{Point2, Vector2, Vector3},
         transform::{Transform},
         Named, WithNamed,
         Time,
@@ -17,7 +17,10 @@ use amethyst::{
     renderer::{
         camera::{ActiveCamera, Camera},
         sprite::{SpriteRender, SpriteSheet, SpriteSheetFormat},
-        ImageFormat, Texture,        
+        ImageFormat, Texture,   
+
+        debug_drawing::{DebugLines, DebugLinesParams},
+
     },
     ui::{ UiCreator, UiEvent, UiEventType, UiFinder, UiText },
     utils::fps_counter::FpsCounter,
@@ -29,18 +32,18 @@ use amethyst::{
 #[derive(Debug)]
 enum BuildingState {
     None,
-    BuildRoad,
-    DemolishRoad
+    //BuildRoad,
+    //DemolishRoad
 }
 
 /// Resource holding the current cursor position in world space
 /// Defaults to i16::MAX, i16::MAX if not set
 pub struct CursorPositionInWorldSpace {
-    pub cursor_position: Point2<i16>
+    pub cursor_position: Point2<f32>
 }
 
 impl Default for CursorPositionInWorldSpace {
-    fn default() -> CursorPositionInWorldSpace { CursorPositionInWorldSpace { cursor_position: Point2::new(std::i16::MAX, std::i16::MAX) } }
+    fn default() -> CursorPositionInWorldSpace { CursorPositionInWorldSpace { cursor_position: Point2::new(std::f32::MAX, std::f32::MAX) } }
 }
 
 impl Default for BuildingState {         
@@ -57,6 +60,109 @@ pub struct GameState {
     button_demolish_road: Option<Entity>,
 
     handle: Option<Handle<SpriteSheet>>,
+}
+
+#[derive(Default, Debug)]
+pub struct BuildRoadState {
+    button_create_road: Option<Entity>,
+    button_demolish_road: Option<Entity>,
+
+    road_start: Option<Point2<f32>>,
+    handle: Option<Handle<SpriteSheet>>,
+}
+
+impl SimpleState for BuildRoadState {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
+        println!("Welcome to road building :)");
+
+
+        self.handle = Some(load_sprite_sheet(
+            data.world,
+            "texture/cp437_20x20.png",
+            "texture/cp437_20x20.ron",
+        ));
+    }
+
+    fn handle_event(
+        &mut self,
+        data: StateData<'_, GameData<'_, '_>>,
+        event: StateEvent,
+    ) -> SimpleTrans {
+        let world = data.world;
+
+        match event {
+            StateEvent::Window(event) => {
+                // Check if the window should be closed
+                if is_close_requested(&event) || is_key_down(&event, VirtualKeyCode::Escape) {
+                    return Trans::Quit;
+                } else if is_key_down(&event, VirtualKeyCode::Escape) {
+                    return Trans::Quit;
+                } else {
+                    Trans::None
+                }
+            },
+
+            StateEvent::Ui(UiEvent {
+                event_type: UiEventType::Click,
+                target,
+            }) => {
+                if Some(target) == self.button_create_road {
+                    return Trans::Pop;
+                }
+
+                Trans::None
+            },
+
+            StateEvent::Input(amethyst::input::InputEvent::MouseButtonPressed(MouseButton::Left)) => {
+                self.road_start = Some(world.read_resource::<CursorPositionInWorldSpace>().cursor_position);
+
+                Trans::None
+            },
+
+            StateEvent::Input(amethyst::input::InputEvent::MouseButtonReleased(MouseButton::Left)) => {
+                let cursor_pos_ws = world.read_resource::<CursorPositionInWorldSpace>().cursor_position;
+
+                if let Some(road_start) = self.road_start {     
+                    let road_endpoints =  if cursor_pos_ws.y > road_start.y { (cursor_pos_ws, road_start) } else { (road_start, cursor_pos_ws) };           
+                    let street_vector: Vector2<f32> = road_endpoints.1 - road_endpoints.0;
+                    let street_length = street_vector.magnitude();
+                    let street_center: Vector2<f32> = street_vector / street_length * (street_length / 2.0);
+                    
+                    
+                    let rotation = -street_vector.angle(&Vector2::new(1.0, 0.0)); 
+
+                    let mut transform = Transform::default();
+                    transform.set_scale(Vector3::new(1.0 / 20.0 * street_length, 1.0, 1.0));
+                    transform.set_translation(Vector3::new(
+                        road_endpoints.0.x + street_center.x, 
+                        road_endpoints.0.y + street_center.y, 
+                        0.0)
+                    );
+                    transform.set_rotation_2d(rotation);
+                    
+
+                    let sprite_sheet_handle = self.handle.as_ref().unwrap();
+
+                    init_sprite(Vector3::new(road_start.x, road_start.y, 0.0), "start", 7, world, sprite_sheet_handle);
+                    init_sprite(Vector3::new(cursor_pos_ws.x, cursor_pos_ws.y, 0.0), "end", 7, world, sprite_sheet_handle);
+
+                    let sprite = SpriteRender::new(sprite_sheet_handle.clone(), 12 * 16 + 4);
+                    world
+                        .create_entity()
+                        .with(transform)
+                        .with(sprite)
+                        .named("Foo Street")
+                        .build();
+                
+                    self.road_start = None;    
+                }
+
+                Trans::None
+            }
+
+            _ => Trans::None
+        }
+    }
 }
 
 const BUTTON_CREATE_ROAD: &str = "CreateRoad";
@@ -181,9 +287,9 @@ impl<'s> System<'s> for MouseRaycastSystem {
                     camera_transform,
                 );
                 let distance = ray.intersect_plane(&Plane::with_z(0.0)).unwrap();
-                let mouse_world_position = ray.at_distance(distance);
+                let mouse_world_position = *ray.at_distance(distance).xy();
 
-                *cursor_pos_ws.cursor_position = *Point2::new(mouse_world_position.x as i16, mouse_world_position.y as i16);
+                *cursor_pos_ws.cursor_position = mouse_world_position;
 
                 // Find any sprites which the mouse is currently inside
                 let mut found_name = None;
@@ -278,7 +384,7 @@ impl SimpleState for GameState {
     /// - Any other keypress is simply logged to the console.
     fn handle_event(
         &mut self,
-        mut data: StateData<'_, GameData<'_, '_>>,
+        data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
     ) -> SimpleTrans {
         let world = data.world;
@@ -299,7 +405,12 @@ impl SimpleState for GameState {
                 target,
             }) => {
                 if Some(target) == self.button_create_road {
-                    log::info!("Trans::Switch Create Road");
+                    return Trans::Push(Box::new(BuildRoadState {
+                        button_create_road: self.button_create_road,
+                        button_demolish_road: self.button_demolish_road,
+                        ..Default::default()
+                    }));
+                    //log::info!("Trans::Switch Create Road");
                 }
 
                 if Some(target) == self.button_demolish_road {
@@ -308,44 +419,6 @@ impl SimpleState for GameState {
 
                 Trans::None
             },
-            StateEvent::Input(amethyst::input::InputEvent::MouseButtonPressed(MouseButton::Left)) => {
-
-                log::info!("Trans::Switch Demolish Road");
-
-                let cursor_pos_ws = world.read_resource::<CursorPositionInWorldSpace>().cursor_position;
-                let _ = init_sprite(
-                    Vector3::new(cursor_pos_ws.x as f32, cursor_pos_ws.y as f32, 0.0),
-                    "Sprite 1",
-                    7,
-                    world,
-                    self.handle.as_ref().unwrap(),
-                );
-                /*
-                if self.current_building_state == BuildingState::BuildRoad {
-                    let _ = init_sprite(
-                        Vector3::new(-50.0, -50.0, 0.0),
-                        "Sprite 3",
-                        7,
-                        world,
-                        &sprite_sheet_handle,
-                    );
-                }
-                */
-                Trans::None
-            },
-
-            StateEvent::Input(amethyst::input::InputEvent::MouseButtonReleased(MouseButton::Left)) => {
-                let cursor_pos_ws = world.read_resource::<CursorPositionInWorldSpace>().cursor_position;
-                let _ = init_sprite(
-                    Vector3::new(cursor_pos_ws.x as f32, cursor_pos_ws.y as f32, 0.0),
-                    "Sprite 1",
-                    7,
-                    world,
-                    self.handle.as_ref().unwrap(),
-                );
-
-                Trans::None
-            }
 
             _ => Trans::None
         }
